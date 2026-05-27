@@ -66,8 +66,8 @@ pipeline {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
                         npx sonar-scanner \
-                          -Dsonar.projectKey=carecompanion-api \
-                          -Dsonar.organization=your-sonar-org \
+                          -Dsonar.projectKey=anja-vuk_carecompanion-api \
+                          -Dsonar.organization=anja-vuk \
                           -Dsonar.sources=src \
                           -Dsonar.tests=tests \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
