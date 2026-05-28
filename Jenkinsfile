@@ -241,8 +241,9 @@ pipeline {
                       --name carecompanion-prometheus \
                       --network carecompanion-net \
                       -p 9090:9090 \
-                      -v $(pwd)/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
-                      prom/prometheus:latest
+                      -v $(pwd)/monitoring:/etc/prometheus \
+                      prom/prometheus:latest \
+                      --config.file=/etc/prometheus/prometheus.yml
 
                     # Start Grafana
                     docker stop carecompanion-grafana 2>/dev/null || true
