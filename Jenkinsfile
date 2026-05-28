@@ -136,7 +136,7 @@ pipeline {
                 sh '''
                     # Get the staging container IP on the Docker network
                     sleep 5
-                    STAGING_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-staging)
+                    STAGING_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}' carecompanion-staging)
                     echo "Staging container IP: ${STAGING_IP}"
                     for i in $(seq 1 12); do
                         STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${STAGING_IP}:3000/health || echo "000")
@@ -187,7 +187,7 @@ pipeline {
                 echo "==> Waiting for production to become healthy..."
                 sh '''
                     sleep 5
-                    PROD_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-prod)
+                    PROD_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}' carecompanion-prod)
                     echo "Production container IP: ${PROD_IP}"
                     for i in $(seq 1 12); do
                         STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${PROD_IP}:3000/health || echo "000")
@@ -259,23 +259,27 @@ pipeline {
                 '''
 
                 echo "==> Waiting for monitoring stack..."
-                sh 'sleep 10'
+                sh 'sleep 15'
 
                 echo "==> Verifying Prometheus is scraping metrics"
                 sh '''
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/-/healthy || echo "000")
+                    PROM_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}' carecompanion-prometheus)
+                    echo "Prometheus IP: ${PROM_IP}"
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${PROM_IP}:9090/-/healthy || echo "000")
                     echo "Prometheus health: ${STATUS}"
                 '''
 
                 echo "==> Verifying Grafana is available"
                 sh '''
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3030/api/health || echo "000")
+                    GRAFANA_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}' carecompanion-grafana)
+                    echo "Grafana IP: ${GRAFANA_IP}"
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${GRAFANA_IP}:3000/api/health || echo "000")
                     echo "Grafana health: ${STATUS}"
                 '''
 
                 echo "==> Simulating incident: sending burst of requests to trigger metrics"
                 sh '''
-                    PROD_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-prod)
+                    PROD_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}' carecompanion-prod)
                     for i in $(seq 1 20); do
                         curl -s http://${PROD_IP}:3000/api/residents > /dev/null
                         curl -s http://${PROD_IP}:3000/api/residents/1/summary > /dev/null
