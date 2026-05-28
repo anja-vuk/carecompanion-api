@@ -66,8 +66,8 @@ pipeline {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
                         npx sonar-scanner \
-                          -Dsonar.projectKey=anja-vuk_carecompanion-api \
-                          -Dsonar.organization=anja-vuk \
+                          -Dsonar.projectKey=carecompanion-api \
+                          -Dsonar.organization=your-sonar-org \
                           -Dsonar.sources=src \
                           -Dsonar.tests=tests \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
@@ -134,8 +134,12 @@ pipeline {
 
                 echo "==> Waiting for staging to become healthy..."
                 sh '''
+                    # Get the staging container IP on the Docker network
+                    sleep 5
+                    STAGING_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-staging)
+                    echo "Staging container IP: ${STAGING_IP}"
                     for i in $(seq 1 12); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${STAGING_PORT}/health || echo "000")
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${STAGING_IP}:3000/health || echo "000")
                         if [ "$STATUS" = "200" ]; then
                             echo "Staging healthy after ${i} attempt(s)"
                             break
@@ -143,7 +147,7 @@ pipeline {
                         echo "Attempt ${i}: status=${STATUS}, retrying in 5s..."
                         sleep 5
                     done
-                    curl -sf http://localhost:${STAGING_PORT}/health
+                    curl -sf http://${STAGING_IP}:3000/health
                 '''
                 echo "==> Staging smoke tests passed"
             }
@@ -182,8 +186,11 @@ pipeline {
 
                 echo "==> Waiting for production to become healthy..."
                 sh '''
+                    sleep 5
+                    PROD_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-prod)
+                    echo "Production container IP: ${PROD_IP}"
                     for i in $(seq 1 12); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${PROD_PORT}/health || echo "000")
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${PROD_IP}:3000/health || echo "000")
                         if [ "$STATUS" = "200" ]; then
                             echo "Production healthy after ${i} attempt(s)"
                             break
@@ -191,7 +198,7 @@ pipeline {
                         echo "Attempt ${i}: status=${STATUS}, retrying in 5s..."
                         sleep 5
                     done
-                    curl -sf http://localhost:${PROD_PORT}/health
+                    curl -sf http://${PROD_IP}:3000/health
                 '''
 
                 echo "==> Tagging Git release v${APP_VERSION}"
@@ -267,10 +274,11 @@ pipeline {
 
                 echo "==> Simulating incident: sending burst of requests to trigger metrics"
                 sh '''
+                    PROD_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' carecompanion-prod)
                     for i in $(seq 1 20); do
-                        curl -s http://localhost:${PROD_PORT}/api/residents > /dev/null
-                        curl -s http://localhost:${PROD_PORT}/api/residents/1/summary > /dev/null
-                        curl -s http://localhost:${PROD_PORT}/api/residents/999 > /dev/null
+                        curl -s http://${PROD_IP}:3000/api/residents > /dev/null
+                        curl -s http://${PROD_IP}:3000/api/residents/1/summary > /dev/null
+                        curl -s http://${PROD_IP}:3000/api/residents/999 > /dev/null
                     done
                     echo "Incident simulation complete — check Grafana at http://localhost:3030"
                 '''
